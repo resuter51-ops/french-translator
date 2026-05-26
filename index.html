@@ -193,13 +193,29 @@ function speak(text, lang) {
 }
 
 function speakNow(text, lang) {
-  window.speechSynthesis.cancel();
-  const voices = window.speechSynthesis.getVoices();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang; u.rate = 0.85; u.volume = 1; u.pitch = 1;
-  const match = voices.find(v => v.lang && v.lang.startsWith(lang.split('-')[0]));
-  if (match) u.voice = match;
-  window.speechSynthesis.speak(u);
+  const TTS_PROXY = 'https://john-174a7c51.base44.app/functions/tts';
+  const ttsLang = lang.startsWith('fr') ? 'fr' : 'en';
+  const chunks = [];
+  const maxLen = 180;
+  let remaining = text.trim();
+  while (remaining.length > 0) {
+    let chunk = remaining.substring(0, maxLen);
+    const lastSpace = chunk.lastIndexOf(' ');
+    if (remaining.length > maxLen && lastSpace > 0) chunk = chunk.substring(0, lastSpace);
+    chunks.push(chunk.trim());
+    remaining = remaining.substring(chunk.length).trim();
+  }
+  let i = 0;
+  function playNext() {
+    if (i >= chunks.length) return;
+    const src = TTS_PROXY + '?lang=' + ttsLang + '&text=' + encodeURIComponent(chunks[i]);
+    const audio = new Audio(src);
+    audio.onended = () => { i++; playNext(); };
+    audio.onerror = () => { i++; playNext(); };
+    audio.play().catch(() => {});
+    i++;
+  }
+  playNext();
 }
 function reSpeak() { if (lastTranslated) speakNow(lastTranslated, lastSpeakLang); }
 function reSpeakText() { if (lastTranslated) speakNow(lastTranslated, lastSpeakLang); }
@@ -210,6 +226,8 @@ function resetAll() {
   hide('originalBox'); hide('translatedBox'); hide('actionBtns'); hide('statusMsg'); hide('recIndicator'); show('hint');
   if (recognition) { try { recognition.stop(); } catch(e){} }
   isRecording = false; activeRec = false;
+  const btn = document.getElementById('micBtn');
+  btn.style.border = 'none';
   updateLabels();
 }
 function resetText() { document.getElementById('textInput').value = ''; document.getElementById('textTranslatedText').textContent = ''; hide('textTranslatedBox'); hide('textActionBtns'); hide('textStatusMsg'); lastTranslated = ''; }
